@@ -1,8 +1,15 @@
 import numpy as np
-import cv2
 import os
 from scipy.interpolate import interp1d
-
+from PIL import Image
+import imageio
+import skimage.transform
+import torch
+import torchvision.transforms
+import time
+import multiprocessing
+import threading
+import queue
 def get_fake_next_observation(current_object_pose, action, dataset_path='./data/shoe_dataset/9_r', action_space = range(0, 360, 5), stochastic=False, sigma=10):
 
         next_object_pose = current_object_pose + action
@@ -17,17 +24,113 @@ def get_fake_next_observation(current_object_pose, action, dataset_path='./data/
         return next_observation, next_object_pose
 
 def get_image_from_pose(pose, dataset_path='./data/shoe_dataset/9_r'):
-    return cv2.imread(dataset_path + str(pose) + '.png')
+    return imageio.imread(dataset_path + str(pose) + '.png')
 
-if __name__ == '__main__':
-    action_space = range(-180, 180, 45)
-    print(action_space)
-    current_object_pose = 0
-    for i in range(105):
-        action = action_space[np.random.randint(len(action_space))]
-        prev_observation_pos = current_object_pose
-        next_observation, current_object_pose = get_fake_next_observation(current_object_pose, action, stochastic=True, sigma=10)
-        print(prev_observation_pos, action, current_object_pose)
-        cv2.imshow('next_observation', next_observation)
-        cv2.waitKey(1000)
-        cv2.destroyAllWindows()
+def get_vgg_feature_for_dataset(vgg16, num_workers=2, dataset_path = './data/atg_dataset.npz'):
+    '''
+    Creates a trained recognition system by generating training features from all training images.
+    [input]
+    * vgg16: prebuilt VGG-16 network.
+    * num_workers: number of workers to process in parallel
+    [saved]
+    * features: numpy.ndarray of shape (N,K)
+    * labels: numpy.ndarray of shape (N)
+    '''
+
+
+    dataset = np.load(dataset_path)
+    images_path = dataset ['images_path']
+    data = dataset['data']
+
+    training_time = time.time()
+
+    directory = './data/tmp/vgg_feats/'
+    if not os.path.exists(directory):
+        os.makedirs(directory)
+        print('creating tmp directory ..')
+
+    pool = multiprocessing.Pool(processes=num_workers)
+    args = []
+    i = 0
+    for obs_act_obs in data:
+        print()
+        args.append([i, str(images_path) + str(obs_act_obs[3])+'.png', vgg16, time.time()])
+        i +=1
+
+    result_list = pool.map(get_image_feature, args)
+
+
+    T    = len(result_list)
+
+    deep_feat  = np.zeros((T, 4096))
+
+    print('Computing deep features ...')
+
+    for result in enumerate(result_list):
+        f_name, index = result[1]
+        f_data = np.load(f_name)
+        deep_feat[index, :] = f_data
+
+    np.savez('atg_dataset_vgg_feat.npz',
+    	  deep_feat=deep_feat)
+
+    print('Done!!')
+    print('Feature extraction took '+ str(round(time.time()-training_time))+ ' secs')
+
+
+def get_image_feature(args):
+	'''
+	Extracts deep features from the prebuilt VGG-16 network.
+	This is a function run by a subprocess.
+ 	[input]
+	* i: index of training image
+	* image_path: path of image file
+	* vgg16: prebuilt VGG-16 network.
+	* time_start: time stamp of start time
+ 	[saved]
+	* feat: evaluated deep feature
+	'''
+
+	i, image_path, vgg16, time_start = args
+
+	# ----- TODO -----
+
+	image = imageio.imread(image_path)
+
+	if len(image.shape)==2:
+		image = np.stack((image,)*3, -1)
+	elif(image.shape[2]==4):
+		image = image[:, :, :3]
+
+	image = preprocess_image(image)
+
+	image_tensor = torch.autograd.Variable(image)
+
+	vgg_fc7   = torch.nn.Sequential(*list(vgg16.classifier.children())[:-2])
+	conv_feat = vgg16.features(image_tensor)
+	fc7_feat  = vgg_fc7(conv_feat.view(-1))
+
+	file_name = os.path.join('./data/tmp/vgg_feats/','vgg_feats_'+str(i)+'.npy')
+	np.save(file_name, fc7_feat.data.numpy())
+
+	print('Done Processing image [' + str(i) + ']')
+
+	return [file_name, i]
+
+def preprocess_image(image):
+	'''
+	Preprocesses the image to load into the prebuilt network.
+	[input]
+	* image: numpy.ndarray of shape (H,W,3)
+	[output]
+	* image_processed: torch.Tensor of shape (3,H,W)
+	'''
+
+	# ----- TODO -----
+	image = skimage.transform.resize(image, (224, 224))
+	trans = torchvision.transforms.Compose([
+		torchvision.transforms.ToTensor(),
+		torchvision.transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+	])
+
+	return trans(np.array(image)).unsqueeze(0)

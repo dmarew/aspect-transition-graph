@@ -1,8 +1,8 @@
 from sklearn.cluster import DBSCAN
 import numpy as np
-X = np.array([[1, 2], [2, 2], [2, 3],
-              [8, 7], [8, 8], [25, 80]])
-clustering = DBSCAN(eps=3, min_samples=2).fit(X)
-print(clustering.labels_, X.shape)
 
-print(clustering)
+if __name__ =='__main__':
+    atg_dataset_vgg_feat = np.load("atg_dataset_vgg_feat.npz")
+    data = atg_dataset_vgg_feat['deep_feat']
+    clustering = DBSCAN(eps=3, min_samples=12).fit(data)
+    print(clustering.labels_)
