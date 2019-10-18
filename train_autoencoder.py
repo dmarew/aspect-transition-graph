@@ -38,7 +38,8 @@ def main():
             optimizer.step()
             running_loss += loss.data
             if batch_index % 100:
-                print('avg loss: ', running_loss/((batch_index + 1)*batch_size), (batch_index + 1)*batch_size)
+                #print('avg loss: ', running_loss/((batch_index + 1)*batch_size), (batch_index + 1)*batch_size)
+                pass
     if not os.path.exists('./weights'):
         os.mkdir('./weights')
 
@@ -48,6 +49,6 @@ def main():
     dataiter = iter(test_loader)
     (in_images, _, _) = dataiter.next()
     decoded_imgs = autoencoder(to_var(in_images))
-    imshow(torchvision.utils.make_grid(decoded_imgs.data))
+    imshow(torchvision.utils.make_grid(decoded_imgs.data), True)
 if __name__ =='__main__':
     main()

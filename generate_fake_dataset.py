@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 
 if __name__ == '__main__':
     action_space = [-180, -135, -90, -45, 45, 90, 135, 180]
-    images_path = './data/shoe_dataset/9_r'
+    images_path = './data/toy_dataset/15_r'
     current_object_pose = 0
     dataset = {}
     dataset['action_space'] = action_space
@@ -15,7 +15,7 @@ if __name__ == '__main__':
         action = action_space[action_index]
         prev_observation_pos = current_object_pose
         next_observation, current_object_pose = get_fake_next_observation(current_object_pose, action, dataset_path=images_path, stochastic=True, sigma=20)
-        print(i, prev_observation_pos, action, action_index, current_object_pose)
+        #print(i, prev_observation_pos, action, action_index, current_object_pose)
         data.append([prev_observation_pos, action, action_index, current_object_pose])
     data = np.array(data)
     np.savez('./data/atg_dataset', data=data, action_space = action_space, images_path=images_path)

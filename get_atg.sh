@@ -1,5 +1,6 @@
 #!/bin/bash
-
+echo "Generatin fake dataset ...."
+python generate_fake_dataset.py
 echo "training autoencoder ..."
 python train_autoencoder.py
 echo "extracting autoencoder features ..."

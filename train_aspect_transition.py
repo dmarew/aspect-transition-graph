@@ -54,8 +54,8 @@ def main():
             if batch_index % 10==0:
                 training_loss_history.append(running_loss/((batch_index + 1)*batch_size))
                 training_acc_history.append(correct/total)
-                print('training loss: ', running_loss/((batch_index + 1)*batch_size), (batch_index + 1)*batch_size)
-                print('training acc : ', 100.*correct/total)
+                #print('training loss: ', running_loss/((batch_index + 1)*batch_size), (batch_index + 1)*batch_size)
+                #print('training acc : ', 100.*correct/total)
 
     if not os.path.exists('./weights'):
         os.mkdir('./weights')

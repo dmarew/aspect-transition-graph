@@ -207,7 +207,7 @@ def get_encoder_feature(args):
     file_name = os.path.join('./data/tmp/encoder_feats/','encoder_feats_'+str(i)+'.npy')
     np.save(file_name, encoder_feat.data.numpy())
 
-    print('Done Processing image [' + str(i) + ']')
+    #print('Done Processing image [' + str(i) + ']')
 
     return [file_name, i]
 def preprocess_image_atg(image):
