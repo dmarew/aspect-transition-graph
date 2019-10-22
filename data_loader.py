@@ -11,6 +11,8 @@ from models import *
 from torchvision import transforms
 from PIL import Image
 from utils import *
+from skimage.transform import warp
+from skimage.transform import SimilarityTransform
 
 class ATGDataset(data.Dataset):
     """ ATG dataset """
@@ -35,7 +37,11 @@ class ATGDataset(data.Dataset):
 
         if self.dataset is not None:
                 images_path = str(self.dataset['images_path'])
-                image = np.array(imageio.imread(images_path + str(self.dataset['data'][index][3]) + '.png'))/255.0
+                rand_x, rand_y = np.random.randint(-10, 10), np.random.randint(-10, 10)
+                tform = SimilarityTransform(translation=(rand_x, rand_y))
+                image = np.array(imageio.imread(images_path + str(self.dataset['data'][index][3]) + '.png'))/255.
+                #image/= 255.0
+                #image = warp(image, tform)
                 image = torch.from_numpy(image).transpose(2,1).transpose(1,0).float()
         if self.labels is not None:
             label = self.labels[index]
@@ -54,6 +60,28 @@ class ATGDataset(data.Dataset):
     def __len__(self):
         """length of dataset"""
         return self.num_samples
+class AspectNodeDataset(data.Dataset):
+    """ Aspect node dataset """
+
+    def __init__(self, dataset, labels):
+
+        super(AspectNodeDataset, self).__init__()
+        self.data = dataset['data']
+        self.labels = labels
+
+    def __getitem__(self, index):
+        """
+        returns
+        """
+        if index == 0:
+            input_feat = torch.from_numpy(np.array([self.labels[index], self.data[index][2]])).float()
+            return input_feat, self.labels[index]
+        input_feat = torch.from_numpy(np.array([self.labels[index], self.data[index][2]])).float()
+        return input_feat, self.labels[index]
+
+    def __len__(self):
+        """length of dataset"""
+        return self.data.shape[0]
 
 if __name__ == '__main__':
     dataset = np.load('./data/atg_dataset.npz')

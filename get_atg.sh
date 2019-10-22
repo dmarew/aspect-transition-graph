@@ -1,4 +1,6 @@
 #!/bin/bash
+
+start=`date +%s`
 echo "Generatin fake dataset ...."
 python generate_fake_dataset.py
 echo "training autoencoder ..."
@@ -9,3 +11,7 @@ echo "clusting over observatons ..."
 python hierarchical_clustering.py
 echo "train aspect transition model"
 python train_aspect_transition.py
+end=`date +%s`
+runtime=$((end-start))
+
+echo "Runtime was $runtime secs"

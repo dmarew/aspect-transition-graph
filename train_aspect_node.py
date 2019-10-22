@@ -17,19 +17,17 @@ def main():
 
 
     dataset = np.load('./data/atg_dataset.npz')
-    actions = dataset['data'][:, 2]
     labels = np.load('data/encoder_clustering_labels.npz')['clustering_labels']
-    atg_dataset_encoder_feat = np.load("data/atg_dataset_encoder_feat.npz")['deep_feat']
-    num_samples = labels.shape[0]
+
     number_of_aspect_nodes = np.max(labels) + 1
 
-    at_model = AspectTransitionModel(number_of_aspect_nodes)
+    at_model = AspectNodeTransitionModel(number_of_aspect_nodes)
 
-    ds = ATGDataset(num_samples, actions=actions, features = atg_dataset_encoder_feat, labels=labels)
+    ds = AspectNodeDataset(dataset, labels=labels)
 
     test_loader = data.DataLoader(ds, batch_size = batch_size, shuffle = True)
     criterion = nn.CrossEntropyLoss()
-    optimizer = optim.SGD(at_model.parameters(), lr = 5e-2)
+    optimizer = optim.SGD(at_model.parameters(), lr = 1e-3)
     training_loss_history = []
     training_acc_history = []
 
@@ -38,15 +36,15 @@ def main():
         running_loss = 0.0
         total = 0
         correct = 0
-        for batch_index, (_, features, labels) in enumerate(test_loader):
-            features, labels = to_var(features), to_var(labels)
+        for batch_index, (current_nodes_actions, next_nodes) in enumerate(test_loader):
+            current_nodes_actions, next_nodes = to_var(current_nodes_actions), to_var(next_nodes)
             optimizer.zero_grad()
-            transition_prob = at_model(features)
+            transition_prob = at_model(current_nodes_actions)
             _, predicted = transition_prob.max(1)
-            total += labels.size(0)
-            correct += predicted.eq(labels).sum().item()
+            total += next_nodes.size(0)
+            correct += predicted.eq(next_nodes).sum().item()
 
-            loss = criterion(transition_prob, labels)
+            loss = criterion(transition_prob, next_nodes)
 
             loss.backward()
             optimizer.step()
@@ -57,12 +55,13 @@ def main():
                 print('training loss: ', running_loss/((batch_index + 1)*batch_size), (batch_index + 1)*batch_size)
                 #print('training acc : ', 100.*correct/total)
 
+
     if not os.path.exists('./weights'):
         os.mkdir('./weights')
 
-    torch.save(at_model.state_dict(), "./weights/at_model.pkl")
-    at_model = AspectTransitionModel(number_of_aspect_nodes)
-    at_model.load_state_dict(torch.load("./weights/at_model.pkl"))
+    torch.save(at_model.state_dict(), "./weights/at_node_model.pkl")
+    at_model = AspectNodeTransitionModel(number_of_aspect_nodes)
+    at_model.load_state_dict(torch.load("./weights/at_node_model.pkl"))
     epoch_count = range(1, len(training_loss_history) + 1)
     plt.plot(epoch_count, training_loss_history, 'r--')
     plt.legend(['Training Loss'])
