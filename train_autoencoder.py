@@ -36,9 +36,9 @@ def main():
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
-            running_loss += loss.data
-            if batch_index % 100:
-                print('avg loss: ', running_loss/((batch_index + 1)*batch_size), (batch_index + 1)*batch_size)
+            running_loss += loss.data.numpy()
+            if batch_index % 1000:
+                print('loss: %.5f batch: %d' % (running_loss/((batch_index + 1)*batch_size), (batch_index + 1)*batch_size))
                 pass
     if not os.path.exists('./weights'):
         os.mkdir('./weights')

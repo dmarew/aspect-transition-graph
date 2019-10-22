@@ -14,7 +14,7 @@ from data_loader import *
 def main():
     number_of_epochs = 1000
     batch_size = 128
-
+    learning_rate = 5e-2
 
     dataset = np.load('./data/atg_dataset.npz')
     actions = dataset['data'][:, 2]
