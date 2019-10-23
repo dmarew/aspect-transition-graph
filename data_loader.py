@@ -17,49 +17,27 @@ from skimage.transform import SimilarityTransform
 class ATGDataset(data.Dataset):
     """ ATG dataset """
 
-    def __init__(self, num_samples, dataset=None, actions = None, features=None, labels=None):
+    def __init__(self, dataset):
 
         super(ATGDataset, self).__init__()
 
         self.dataset   = dataset
-        self.labels = labels
-        self.features = features
-        self.num_samples = num_samples
-        self.actions = actions
+        self.transformer = transforms.Compose([
+                           transforms.Resize(64),
+                           transforms.ToTensor()])
 
     def __getitem__(self, index):
         """
         returns
         """
-        image = 0
-        label = 0
-        feature = 0
+        image = Image.open(self.dataset[index])
+        image = self.transformer(image)
 
-        if self.dataset is not None:
-                images_path = str(self.dataset['images_path'])
-                rand_x, rand_y = np.random.randint(-10, 10), np.random.randint(-10, 10)
-                tform = SimilarityTransform(translation=(rand_x, rand_y))
-                image = np.array(imageio.imread(images_path + str(self.dataset['data'][index][3]) + '.png'))/255.
-                #image/= 255.0
-                #image = warp(image, tform)
-                image = torch.from_numpy(image).transpose(2,1).transpose(1,0).float()
-        if self.labels is not None:
-            label = self.labels[index]
-        if self.features is not None:
-
-            if index > 0:
-                feature = self.features[index-1]
-            else:
-                feature = self.features[index]
-            action_one_hot = np.zeros(np.max(self.actions)+1)
-            action_one_hot[self.actions[index]] = 1.
-            feature = torch.from_numpy(np.hstack((feature, action_one_hot))).float()
-
-        return image, feature, label
-
+        return image
     def __len__(self):
         """length of dataset"""
-        return self.num_samples
+        return len(self.dataset)
+
 class AspectNodeDataset(data.Dataset):
     """ Aspect node dataset """
 

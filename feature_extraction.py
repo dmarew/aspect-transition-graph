@@ -9,6 +9,6 @@ if __name__=='__main__':
     encoder = autoencoder[0]
     print('encoder', encoder)
     get_encoder_feature_for_dataset(encoder,
-                                        num_workers=6,
-                                        dataset_path = 'data/atg_dataset.npz',
-                                        output_path='data/atg_dataset_encoder_feat.npz')
+                                        num_workers=8,
+                                        dataset_path = 'data/real_aspects/',
+                                        output_path='data/real_dataset_encoder_feat.npz')

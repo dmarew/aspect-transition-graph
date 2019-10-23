@@ -15,29 +15,78 @@ import time
 import multiprocessing
 import threading
 import queue
+import glob
+
 from sklearn.cluster import *
 from scipy.spatial import distance
+from models import *
 
-def get_belief_given_observation(image, encoder, aspect_nodes):
-    pass
 
-def get_aspect_nodes(features, clustering_labels):
+def get_belief_given_observation(image_path, encoder, aspect_nodes_path):
+    belief_time = time.time()
+    image = imageio.imread(image_path)
+    aspect_nodes = np.load(aspect_nodes_path)['aspect_nodes']
+    num_aspect_nodes = len(aspect_nodes)
+
+    if len(image.shape)==2:
+    	image = np.stack((image,)*3, -1)
+    elif(image.shape[2]==4):
+    	image = image[:, :, :3]
+
+    image = preprocess_image_atg(image)
+
+    image_tensor = to_var(image)
+    encoder_feat = encoder(image_tensor).view(-1).data.numpy()
+
+    belief = np.zeros(num_aspect_nodes)
+
+    for i, aspect_node in enumerate(aspect_nodes):
+        belief[i] = 1./distance.euclidean(encoder_feat, aspect_node)
+    belief -= belief.min()
+    belief  = 400*belief
+
+    belief = torch.nn.functional.softmax(torch.from_numpy(belief), dim=0).numpy()
+    print(belief, belief.max(), belief.sum())
+    print('getting belief took %.2f secs'%(time.time()-belief_time))
+    plt.bar(np.arange(belief.shape[0]), belief)
+
+
+def get_aspect_nodes(clustering_result_path, dataset_path, aspect_nodes_path):
+
+    atg_time = time.time()
+    dataset = np.array(glob.glob(dataset_path + '*'))
+
+    clustering_result = np.load(clustering_result_path)
+
+    clustering_labels = clustering_result['clustering_labels']
+    clustering_features = clustering_result['clustering_features']
 
     num_aspect_nodes   = np.max(clustering_labels) + 1
     aspect_nodes = []
-
+    aspect_node_images = []
     for i in range(num_aspect_nodes):
-        ith_aspects = features[clustering_labels==i]
-        mean_aspect_node = ith_aspects.mean(axis=0, keepdims=True)
-        print(ith_aspects.shape, mean_aspect_node.shape)
-        distance_to_mean = distance.cdist(ith_aspects ,
-                                          mean_aspect_node,
-                                          metric='euclidean')
-        print('min_distance: ', distance_to_mean.shape, distance_to_mean==distance_to_mean.min())
-        token_aspect_node_index = np.where(distance_to_mean==distance_to_mean.min())
-        print(i, token_aspect_node_index)
-        aspect_nodes.append(token_aspect_node_index)
 
+        aspects = clustering_features[clustering_labels==i]
+        images_of_aspects  = dataset[clustering_labels==i]
+
+        mean_aspect = aspects.mean(axis=0, keepdims=True)
+        distance_to_mean = distance.cdist(aspects ,
+                                          mean_aspect,
+                                          metric='euclidean').squeeze(1)
+        token_a_n_idx = np.where(distance_to_mean==distance_to_mean.min())[0][0]
+        token_aspect_node = aspects[token_a_n_idx]
+        token_aspect_node_image_path = images_of_aspects[token_a_n_idx]
+
+        aspect_nodes.append(token_aspect_node)
+        image = imageio.imread(token_aspect_node_image_path)
+        aspect_node_images.append(image)
+
+
+    aspect_nodes = np.array(aspect_nodes)
+    aspect_node_images = np.stack(aspect_node_images)
+
+    np.savez(aspect_nodes_path, aspect_nodes=aspect_nodes, aspect_node_images=aspect_node_images)
+    print('extracting aspect_nodes took %.2f secs '%(time.time()-atg_time))
 
 def build_aspect_transition_graph(clustering_result_path):
 
@@ -61,28 +110,28 @@ def build_aspect_transition_graph(clustering_result_path):
 
 def cluster_observations_to_aspect_nodes(encoder_feats_path,
                                          clustering_algorithm = 'DBSCAN',
-                                         output_path = 'data/encoder_clustering_result.npz'):
+                                         clustering_param = {'eps': 5e1, 'min_samples': 1},
+                                         output_path = 'data/real_encoder_clustering_result.npz'):
 
     atg_dataset_feat = np.load(encoder_feats_path)
-    data = atg_dataset_feat['deep_feat']
-    action_seq = atg_dataset_feat['action_seq']
+    data = atg_dataset_feat['encoder_feat']
+    #print(data[0], data[0].min(), data[0].max())
     clustering_time = time.time()
     if clustering_algorithm == 'DBSCAN':
-        clustering = DBSCAN(eps=3, min_samples=12).fit(data)
+        clustering = DBSCAN(eps=clustering_param['eps'], min_samples=clustering_param['min_samples']).fit(data)
         print(clustering.labels_)
         print('clustering cores ', clustering.components_.shape)
         print('clustering took ', time.time()-clustering_time, ' secs')
         print('Found ', np.max(clustering.labels_) + 1, ' unique aspect nodes')
-        np.savez(output_path, clustering_labels = clustering.labels_, action_seq=action_seq)
+        np.savez(output_path, clustering_labels = clustering.labels_, clustering_features=data)
 
-        get_aspect_nodes(clustering.components_, clustering.labels_)
 
     else:
         raise NotImplementedError(clustering_algorithm + " has not been implemented yet!!")
 
 def get_encoder_feature_for_dataset(encoder,
                                     num_workers=2,
-                                    dataset_path = 'data/atg_dataset.npz',
+                                    dataset_path = 'data/real_aspects/',
                                     output_path='data/atg_dataset_encoder_feat.npz'):
     '''
     Creates a trained recognition system by generating training features from all training images.
@@ -95,40 +144,36 @@ def get_encoder_feature_for_dataset(encoder,
     '''
 
 
-    dataset = np.load(dataset_path)
-    images_path = dataset ['images_path']
-    data = dataset['data']
-    action_seq = data[:, 2]
+    dataset = glob.glob(dataset_path + '*')
+
     training_time = time.time()
 
-    directory = './data/tmp/encoder_feats/'
+    directory = 'data/tmp/encoder_feats/'
     if not os.path.exists(directory):
         os.makedirs(directory)
         print('creating tmp directory ..')
 
     pool = multiprocessing.Pool(processes=num_workers)
     args = []
-    i = 0
-    for obs_act_obs in data:
-        #print()
-        args.append([i, str(images_path) + str(obs_act_obs[3])+'.png', encoder, time.time()])
-        i +=1
+
+    for i, image_path in enumerate(dataset):
+        args.append([i, image_path, encoder, time.time()])
 
     result_list = pool.map(get_encoder_feature, args)
 
 
     T    = len(result_list)
 
-    deep_feat  = np.zeros((T, 6912))
+    encoder_feat  = np.zeros((T, 6400))
 
     print('Computing deep features ...')
 
     for result in enumerate(result_list):
         f_name, index = result[1]
         f_data = np.load(f_name)
-        deep_feat[index, :] = f_data
+        encoder_feat[index, :] = f_data
 
-    np.savez(output_path, deep_feat=deep_feat, action_seq=action_seq)
+    np.savez(output_path, encoder_feat=encoder_feat)
 
     print('Done!!')
     print('Feature extraction took '+ str(round(time.time()-training_time))+ ' secs')
@@ -167,7 +212,7 @@ def get_encoder_feature(args):
     file_name = os.path.join('./data/tmp/encoder_feats/','encoder_feats_'+str(i)+'.npy')
     np.save(file_name, encoder_feat.data.numpy())
 
-    #print('Done Processing image [' + str(i) + ']')
+    print('Done Processing image [' + str(i) + ']')
 
     return [file_name, i]
 
@@ -329,8 +374,19 @@ def imshow(img, display=False):
 if __name__ =='__main__':
     encoder_feats_path = 'data/atg_dataset_encoder_feat.npz'
     clustering_result_path = 'data/encoder_clustering_result.npz'
+    aspect_nodes_path = 'data/aspect_nodes.npz'
+    image_path = 'data/toy_dataset/15_r0.png'
+
+    autoencoder = nn.Sequential(Encoder(), Decoder())
+    autoencoder.load_state_dict(torch.load("weights/autoencoder.pkl"))
+    encoder = autoencoder[0]
+
     print('clustering ...')
-    cluster_observations_to_aspect_nodes(encoder_feats_path, clustering_algorithm = 'DBSCAN', output_path = clustering_result_path)
+    #cluster_observations_to_aspect_nodes(encoder_feats_path, clustering_algorithm = 'DBSCAN', output_path = clustering_result_path)
+    get_aspect_nodes(clustering_result_path, aspect_nodes_path)
+    print('computing belief')
+    get_belief_given_observation(image_path, encoder, aspect_nodes_path)
+
     print('build aspect transition graph ...')
     atg = build_aspect_transition_graph(clustering_result_path)
     plt.bar(np.arange(72), atg[56, 5, :])
