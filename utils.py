@@ -24,16 +24,12 @@ from models import *
 
 def get_belief_given_observation(image_path, encoder, aspect_nodes_path):
     belief_time = time.time()
-    image = imageio.imread(image_path)
+
     aspect_nodes = np.load(aspect_nodes_path)['aspect_nodes']
     num_aspect_nodes = len(aspect_nodes)
 
-    if len(image.shape)==2:
-    	image = np.stack((image,)*3, -1)
-    elif(image.shape[2]==4):
-    	image = image[:, :, :3]
-
-    image = preprocess_image_atg(image)
+    image = Image.open(image_path)
+    image = image_to_tensor(image)
 
     image_tensor = to_var(image)
     encoder_feat = encoder(image_tensor).view(-1).data.numpy()
@@ -116,23 +112,26 @@ def cluster_observations_to_aspect_nodes(encoder_feats_path,
     data = atg_dataset_feat['encoder_feat']
     #print(data[0], data[0].min(), data[0].max())
     clustering_time = time.time()
+    num_unique_apect_nodes = 0
     if clustering_algorithm == 'DBSCAN':
         clustering = DBSCAN(eps=clustering_param['eps'], min_samples=clustering_param['min_samples']).fit(data)
-        print(clustering.labels_)
-        print('clustering took ', time.time()-clustering_time, ' secs')
-        print('Found ', np.max(clustering.labels_) + 1, ' unique aspect nodes')
+        #print(clustering.labels_)
+        #print('clustering took ', time.time()-clustering_time, ' secs')
+        #print('Found ', np.max(clustering.labels_) + 1, ' unique aspect nodes')
+        num_unique_apect_nodes = np.max(clustering.labels_) + 1
         np.savez(output_path, clustering_labels = clustering.labels_, clustering_features=data)
 
 
     elif clustering_algorithm == 'OPTICS':
         clustering = OPTICS(min_samples=clustering_param['min_samples'], max_eps= clustering_param['max_eps'], xi=clustering_param['xi']).fit(data)
-        print(clustering.labels_)
-        print('clustering took ', time.time()-clustering_time, ' secs')
-        print('Found ', np.max(clustering.labels_) + 1, ' unique aspect nodes')
+        #print(clustering.labels_)
+        #print('clustering took ', time.time()-clustering_time, ' secs')
+        #print('Found ', np.max(clustering.labels_) + 1, ' unique aspect nodes')
         np.savez(output_path, clustering_labels = clustering.labels_, clustering_features=data)
+        num_unique_apect_nodes = np.max(clustering.labels_) + 1
     else:
         raise NotImplementedError(clustering_algorithm + " has not been implemented yet!!")
-
+    return num_unique_apect_nodes
 def get_encoder_feature_for_dataset(encoder,
                                     num_workers=2,
                                     dataset_path = 'data/real_aspects/',
@@ -201,17 +200,12 @@ def get_encoder_feature(args):
 
     # ----- TODO -----
 
-    image = imageio.imread(image_path)
 
-    if len(image.shape)==2:
-    	image = np.stack((image,)*3, -1)
-    elif(image.shape[2]==4):
-    	image = image[:, :, :3]
+    image = Image.open(image_path)
+    image = image_to_tensor(image)
 
-    image = preprocess_image_atg(image)
-
-    image_tensor = to_var(image)
-    encoder_feat = encoder(image_tensor).view(-1)
+    image = to_var(image)
+    encoder_feat = encoder(image).view(-1)
 
     file_name = os.path.join('./data/tmp/encoder_feats/','encoder_feats_'+str(i)+'.npy')
     np.save(file_name, encoder_feat.data.numpy())
@@ -326,21 +320,13 @@ def get_image_feature(args):
 
 	return [file_name, i]
 
-def preprocess_image_atg(image):
-	'''
-	Preprocesses the image to load into the prebuilt network.
-	[input]
-	* image: numpy.ndarray of shape (H,W,3)
-	[output]
-	* image_processed: torch.Tensor of shape (3,H,W)
-	'''
+def image_to_tensor(image, image_size=64):
 
-	# ----- TODO -----
-	image = image/255.0
-	trans = torchvision.transforms.Compose([
-		torchvision.transforms.ToTensor()
-	])
-	return trans(np.array(image)).unsqueeze(0).float()
+    transform = torchvision.transforms.Compose([
+        torchvision.transforms.Resize(image_size),
+    	torchvision.transforms.ToTensor()
+    ])
+    return transform(image).unsqueeze(0)
 def preprocess_image(image):
 	'''
 	Preprocesses the image to load into the prebuilt network.

@@ -17,13 +17,13 @@ from skimage.transform import SimilarityTransform
 class ATGDataset(data.Dataset):
     """ ATG dataset """
 
-    def __init__(self, dataset):
+    def __init__(self, dataset, image_size=64):
 
         super(ATGDataset, self).__init__()
 
         self.dataset   = dataset
         self.transformer = transforms.Compose([
-                           transforms.Resize(64),
+                           transforms.Resize(image_size),
                            transforms.ToTensor()])
 
     def __getitem__(self, index):
@@ -32,7 +32,6 @@ class ATGDataset(data.Dataset):
         """
         image = Image.open(self.dataset[index])
         image = self.transformer(image)
-
         return image
     def __len__(self):
         """length of dataset"""
