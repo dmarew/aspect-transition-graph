@@ -19,6 +19,8 @@ class Encoder(nn.Module):
         nn.Conv2d(64, 64, kernel_size = 3, stride=2, padding=1),
         nn.ReLU(),
         nn.Conv2d(64, 64, kernel_size = 3, stride=2, padding=1),
+        nn.ReLU(),
+        nn.Conv2d(64, 64, kernel_size = 3, stride=2, padding=1),
         nn.ReLU()
         ])
 
@@ -35,6 +37,8 @@ class Decoder(nn.Module):
         """Load the pretrained ResNet-152 and replace top fc layer."""
         super(Decoder, self).__init__()
         self.layers = nn.ModuleList([
+		nn.ConvTranspose2d(64, 64, 4, stride=2, padding=1),
+        nn.ReLU(),
 		nn.ConvTranspose2d(64, 64, 4, stride=2, padding=1),
         nn.ReLU(),
 		nn.ConvTranspose2d(64, 64, 4, stride=2, padding=1),

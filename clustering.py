@@ -12,10 +12,15 @@ if __name__ =='__main__':
     autoencoder = nn.Sequential(Encoder(), Decoder())
     autoencoder.load_state_dict(torch.load("weights/autoencoder.pkl"))
     encoder = autoencoder[0]
-    '''
+
     cluster_observations_to_aspect_nodes(encoder_feats_path,
                                          clustering_algorithm = 'DBSCAN',
-                                         clustering_param = {'eps': 7e1, 'min_samples': 1},
+                                         clustering_param = {'eps': 3e1, 'min_samples': 1},
+                                         output_path = 'data/real_encoder_clustering_result.npz')
+    '''
+    cluster_observations_to_aspect_nodes(encoder_feats_path,
+                                         clustering_algorithm = 'OPTICS',
+                                         clustering_param = {'max_eps':2e8, 'xi': 0.05, 'min_samples': 1, 'min_cluster_size':None},
                                          output_path = 'data/real_encoder_clustering_result.npz')
     '''
     get_aspect_nodes(clustering_result_path, dataset_path, aspect_nodes_path)
@@ -25,14 +30,16 @@ if __name__ =='__main__':
 
 
     image_dir_path = 'data/real_aspects/Aspect-Raw'
-    for i in range(1, 10):
-        idx = np.random.randint(1300)
+
+    for i in range(5):
+        idx = 800 + np.random.randint(500)
         image_path = image_dir_path + str(idx) + '.jpg'
         print(image_path)
         in_image = Image.open(image_path, 'r')
         plt.figure(0)
         plt.imshow(np.asarray(in_image))
         plt.figure(1)
-        get_belief_given_observation(image_path, encoder, aspect_nodes_path)
+        belief = get_belief_given_observation(image_path, encoder, aspect_nodes_path)
+        plt.bar(np.arange(belief.shape[0]), belief)
         plt.figure(2)
         imshow(torchvision.utils.make_grid(aspect_node_images.data), True)

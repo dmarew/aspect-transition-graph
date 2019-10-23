@@ -41,15 +41,14 @@ def get_belief_given_observation(image_path, encoder, aspect_nodes_path):
     belief = np.zeros(num_aspect_nodes)
 
     for i, aspect_node in enumerate(aspect_nodes):
-        belief[i] = 1./distance.euclidean(encoder_feat, aspect_node)
+        belief[i] = 1./(1e-8 + distance.euclidean(encoder_feat, aspect_node))
     belief -= belief.min()
-    belief  = 400*belief
+    belief  = 100*belief
 
     belief = torch.nn.functional.softmax(torch.from_numpy(belief), dim=0).numpy()
-    print(belief, belief.max(), belief.sum())
+    #print(belief, belief.max(), belief.sum())
     print('getting belief took %.2f secs'%(time.time()-belief_time))
-    plt.bar(np.arange(belief.shape[0]), belief)
-
+    return belief
 
 def get_aspect_nodes(clustering_result_path, dataset_path, aspect_nodes_path):
 
@@ -120,12 +119,17 @@ def cluster_observations_to_aspect_nodes(encoder_feats_path,
     if clustering_algorithm == 'DBSCAN':
         clustering = DBSCAN(eps=clustering_param['eps'], min_samples=clustering_param['min_samples']).fit(data)
         print(clustering.labels_)
-        print('clustering cores ', clustering.components_.shape)
         print('clustering took ', time.time()-clustering_time, ' secs')
         print('Found ', np.max(clustering.labels_) + 1, ' unique aspect nodes')
         np.savez(output_path, clustering_labels = clustering.labels_, clustering_features=data)
 
 
+    elif clustering_algorithm == 'OPTICS':
+        clustering = OPTICS(min_samples=clustering_param['min_samples'], max_eps= clustering_param['max_eps'], xi=clustering_param['xi']).fit(data)
+        print(clustering.labels_)
+        print('clustering took ', time.time()-clustering_time, ' secs')
+        print('Found ', np.max(clustering.labels_) + 1, ' unique aspect nodes')
+        np.savez(output_path, clustering_labels = clustering.labels_, clustering_features=data)
     else:
         raise NotImplementedError(clustering_algorithm + " has not been implemented yet!!")
 
@@ -161,10 +165,10 @@ def get_encoder_feature_for_dataset(encoder,
 
     result_list = pool.map(get_encoder_feature, args)
 
-
+    feat_dim = np.load(result_list[0][0]).shape[0]
     T    = len(result_list)
 
-    encoder_feat  = np.zeros((T, 6400))
+    encoder_feat  = np.zeros((T, feat_dim))
 
     print('Computing deep features ...')
 
@@ -283,8 +287,6 @@ def get_vgg_feature_for_dataset(vgg16, num_workers=2, dataset_path = './data/atg
     print('Done!!')
     print('Feature extraction took '+ str(round(time.time()-training_time))+ ' secs')
 
-
-
 def get_image_feature(args):
 	'''
 	Extracts deep features from the prebuilt VGG-16 output_pathnetwork.
@@ -371,23 +373,3 @@ def imshow(img, display=False):
     plt.savefig('autoencoder_output.png')
     if display:
         plt.show()
-if __name__ =='__main__':
-    encoder_feats_path = 'data/atg_dataset_encoder_feat.npz'
-    clustering_result_path = 'data/encoder_clustering_result.npz'
-    aspect_nodes_path = 'data/aspect_nodes.npz'
-    image_path = 'data/toy_dataset/15_r0.png'
-
-    autoencoder = nn.Sequential(Encoder(), Decoder())
-    autoencoder.load_state_dict(torch.load("weights/autoencoder.pkl"))
-    encoder = autoencoder[0]
-
-    print('clustering ...')
-    #cluster_observations_to_aspect_nodes(encoder_feats_path, clustering_algorithm = 'DBSCAN', output_path = clustering_result_path)
-    get_aspect_nodes(clustering_result_path, aspect_nodes_path)
-    print('computing belief')
-    get_belief_given_observation(image_path, encoder, aspect_nodes_path)
-
-    print('build aspect transition graph ...')
-    atg = build_aspect_transition_graph(clustering_result_path)
-    plt.bar(np.arange(72), atg[56, 5, :])
-    plt.show()
