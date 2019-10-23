@@ -38,10 +38,13 @@ def get_belief_given_observation(image_path, encoder, aspect_nodes_path):
 
     for i, aspect_node in enumerate(aspect_nodes):
         belief[i] = 1./(1e-8 + distance.euclidean(encoder_feat, aspect_node))
-    belief -= belief.min()
-    belief  = 100*belief
 
-    belief = torch.nn.functional.softmax(torch.from_numpy(belief), dim=0).numpy()
+    total_belief = belief.sum()
+    belief /= total_belief
+    #belief -= belief.min()
+    #belief  = 100*belief
+
+    #belief = torch.nn.functional.softmax(torch.from_numpy(belief), dim=0).numpy()
     #print(belief, belief.max(), belief.sum())
     print('getting belief took %.2f secs'%(time.time()-belief_time))
     return belief
@@ -113,6 +116,8 @@ def cluster_observations_to_aspect_nodes(encoder_feats_path,
     #print(data[0], data[0].min(), data[0].max())
     clustering_time = time.time()
     num_unique_apect_nodes = 0
+    print('Performing %s clustering'%(clustering_algorithm))
+
     if clustering_algorithm == 'DBSCAN':
         clustering = DBSCAN(eps=clustering_param['eps'], min_samples=clustering_param['min_samples']).fit(data)
         #print(clustering.labels_)
@@ -127,6 +132,16 @@ def cluster_observations_to_aspect_nodes(encoder_feats_path,
         #print(clustering.labels_)
         #print('clustering took ', time.time()-clustering_time, ' secs')
         #print('Found ', np.max(clustering.labels_) + 1, ' unique aspect nodes')
+        np.savez(output_path, clustering_labels = clustering.labels_, clustering_features=data)
+        num_unique_apect_nodes = np.max(clustering.labels_) + 1
+    elif clustering_algorithm == 'AffinityPropagation':
+
+        clustering = AffinityPropagation(damping=clustering_param['damping'],
+                                         max_iter=clustering_param['max_iter'],
+                                         convergence_iter=clustering_param['convergence_iter'],verbose=True).fit(data)
+        #print(clustering.labels_)
+        print('clustering took ', time.time()-clustering_time, ' secs')
+        print('Found ', np.max(clustering.labels_) + 1, ' unique aspect nodes')
         np.savez(output_path, clustering_labels = clustering.labels_, clustering_features=data)
         num_unique_apect_nodes = np.max(clustering.labels_) + 1
     else:
