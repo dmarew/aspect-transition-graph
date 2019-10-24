@@ -23,7 +23,8 @@ class ATGDataset(data.Dataset):
 
         self.dataset   = dataset
         self.transformer = transforms.Compose([
-                           transforms.Resize(image_size),
+                           transforms.Resize(image_size + 2),
+                           transforms.CenterCrop(image_size),
                            transforms.ToTensor()])
 
     def __getitem__(self, index):
