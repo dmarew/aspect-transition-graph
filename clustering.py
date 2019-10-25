@@ -65,7 +65,7 @@ if __name__ =='__main__':
                                          clustering_algorithm = 'OPTICS',
                                          clustering_param = {'max_eps':2e8, 'xi': 0.05, 'min_samples': 1, 'min_cluster_size':None},
                                          output_path = 'data/real_encoder_clustering_result.npz')
-    '''
+
 
     cluster(encoder_feats_path,
                 expected_number_of_nodes = 7,
@@ -75,6 +75,7 @@ if __name__ =='__main__':
                 clustering_algorithm = 'DBSCAN',
                 min_samples = 1,
                 output_path = 'data/real_encoder_clustering_result.npz')
+    '''
 
     get_aspect_nodes(clustering_result_path, dataset_path, aspect_nodes_path)
 
@@ -90,10 +91,27 @@ if __name__ =='__main__':
         image_path = image_dir_path + str(idx) + '.jpg'
         print(image_path)
         in_image = Image.open(image_path, 'r')
-        plt.figure(0)
+        [belief_inv, belief_cosine, belief_neg] = get_belief_given_observation(image_path, encoder, aspect_nodes_path)
+
+        plt.subplot(2, 3, 1)
         plt.imshow(np.asarray(in_image))
-        plt.figure(1)
-        belief = get_belief_given_observation(image_path, encoder, aspect_nodes_path)
-        plt.bar(np.arange(belief.shape[0]), belief)
-        plt.figure(2)
-        imshow(torchvision.utils.make_grid(aspect_node_images.data), True)
+        plt.title('Input image')
+        plt.subplot(2, 3, 2)
+        plt.bar(np.arange(belief_inv.shape[0]), belief_inv)
+        plt.title('Inverse standard euclidean distance belief')
+        plt.xlabel('aspect')
+        plt.ylabel('belief')
+        plt.subplot(2, 3, 3)
+        plt.bar(np.arange(belief_cosine.shape[0]), belief_cosine)
+        plt.title('Inverse squared euclidean distance belief')
+        plt.xlabel('aspect')
+        plt.ylabel('belief')
+        plt.subplot(2, 3, 4)
+        plt.bar(np.arange(belief_neg.shape[0]), belief_neg)
+        plt.title('Negative distance belief')
+        plt.xlabel('aspect')
+        plt.ylabel('belief')
+        plt.subplot(2, 3, 5)
+        imshow(torchvision.utils.make_grid(aspect_node_images.data), False)
+        plt.title('Aspect nodes')
+        plt.show()

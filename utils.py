@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 import torch
 import torchvision.transforms
 from torch.autograd import Variable
+from torch.nn.functional import softmax
 #system
 import os
 import time
@@ -34,20 +35,24 @@ def get_belief_given_observation(image_path, encoder, aspect_nodes_path):
     image_tensor = to_var(image)
     encoder_feat = encoder(image_tensor).view(-1).data.numpy()
 
-    belief = np.zeros(num_aspect_nodes)
+    belief_inverse_dist = np.zeros(num_aspect_nodes)
+    belief_negative_dist = np.zeros(num_aspect_nodes)
+    belief_squared_dist = np.zeros(num_aspect_nodes)
+
 
     for i, aspect_node in enumerate(aspect_nodes):
-        belief[i] = 1./(1e-8 + distance.euclidean(encoder_feat, aspect_node))
+        belief_inverse_dist[i] = 1./(1e-8 + distance.euclidean(encoder_feat, aspect_node))
+        belief_negative_dist[i] = -distance.euclidean(encoder_feat, aspect_node)
+        belief_squared_dist[i] = 1./(1e-8 + distance.sqeuclidean(encoder_feat, aspect_node))
 
-    total_belief = belief.sum()
-    belief /= total_belief
-    #belief -= belief.min()
-    #belief  = 100*belief
+    belief_inverse_dist /= belief_inverse_dist.sum()
+    belief_squared_dist /= belief_squared_dist.sum()
+    belief_negative_dist -=  (belief_negative_dist.min() + belief_negative_dist.max())
+    belief_negative_dist /=  belief_negative_dist.sum()
 
-    #belief = torch.nn.functional.softmax(torch.from_numpy(belief), dim=0).numpy()
-    #print(belief, belief.max(), belief.sum())
+
     print('getting belief took %.2f secs'%(time.time()-belief_time))
-    return belief
+    return belief_inverse_dist, belief_squared_dist, belief_negative_dist
 
 def get_aspect_nodes(clustering_result_path, dataset_path, aspect_nodes_path):
 
